@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import axios from "axios";
 import "./index.css";
 
@@ -13,6 +13,7 @@ function App() {
   const [file, setFile] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
 
   const [question, setQuestion] = useState("");
   const [qaAnswer, setQaAnswer] = useState("");
@@ -22,9 +23,11 @@ function App() {
   const [jdLoading, setJdLoading] = useState(false);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
 
+  const hasResume = useMemo(() => resumeText.trim().length > 0, [resumeText]);
+
   const handleUpload = async () => {
     if (!file) {
-      alert("请先选择简历文件");
+      setUploadMessage("请先选择简历文件");
       return;
     }
 
@@ -33,6 +36,11 @@ function App() {
 
     try {
       setLoading(true);
+      setUploadMessage("");
+      setResumeText("");
+      setQaAnswer("");
+      setMatchResult(null);
+
       const res = await axios.post(
         "http://127.0.0.1:8000/api/resume/upload",
         formData,
@@ -44,11 +52,12 @@ function App() {
       );
 
       setResumeText(res.data.resumeText || "");
-      setQaAnswer("");
-      setMatchResult(null);
-    } catch (error) {
-      console.error("上传失败:", error);
-      alert("上传或解析失败，请检查后端是否启动");
+      setUploadMessage("简历解析成功，可以开始问答和 JD 匹配分析了");
+    } catch (error: any) {
+      console.error("上传失败：", error);
+      const detail =
+        error?.response?.data?.detail || error?.message || "未知错误";
+      setUploadMessage(`上传或解析失败：${detail}`);
     } finally {
       setLoading(false);
     }
@@ -56,17 +65,18 @@ function App() {
 
   const handleAskQuestion = async () => {
     if (!resumeText.trim()) {
-      alert("请先上传并解析简历");
+      setQaAnswer("请先上传并解析简历");
       return;
     }
 
     if (!question.trim()) {
-      alert("请输入你的问题");
+      setQaAnswer("请输入你的问题");
       return;
     }
 
     try {
       setQaLoading(true);
+      setQaAnswer("");
 
       const res = await axios.post("http://127.0.0.1:8000/api/chat/ask", {
         resumeText,
@@ -74,11 +84,11 @@ function App() {
       });
 
       setQaAnswer(res.data.answer || "暂无回答");
-    } catch (error) {
-      console.error("问答失败:", error);
-      setQaAnswer(
-        "问答接口暂未连接成功。你可以先继续完善页面，后端 /api/chat/ask 接好后这里会正常显示 AI 回答。"
-      );
+    } catch (error: any) {
+      console.error("问答失败：", error);
+      const detail =
+        error?.response?.data?.detail || error?.message || "未知错误";
+      setQaAnswer(`问答失败：${detail}`);
     } finally {
       setQaLoading(false);
     }
@@ -86,17 +96,28 @@ function App() {
 
   const handleJDMatch = async () => {
     if (!resumeText.trim()) {
-      alert("请先上传并解析简历");
+      setMatchResult({
+        score: 0,
+        matched: ["请先上传并解析简历"],
+        missing: ["当前没有可用于分析的简历内容"],
+        suggestions: ["先上传简历，再进行岗位匹配分析"],
+      });
       return;
     }
 
     if (!jdText.trim()) {
-      alert("请输入岗位 JD");
+      setMatchResult({
+        score: 0,
+        matched: ["请输入岗位 JD"],
+        missing: ["当前没有岗位描述内容"],
+        suggestions: ["粘贴岗位要求后再开始分析"],
+      });
       return;
     }
 
     try {
       setJdLoading(true);
+      setMatchResult(null);
 
       const res = await axios.post("http://127.0.0.1:8000/api/jd/match", {
         resumeText,
@@ -104,16 +125,28 @@ function App() {
       });
 
       setMatchResult(res.data.result || null);
-    } catch (error) {
-      console.error("JD 分析失败:", error);
+    } catch (error: any) {
+      console.error("JD 分析失败：", error);
+      const detail =
+        error?.response?.data?.detail || error?.message || "未知错误";
+
       setMatchResult({
         score: 0,
-        matched: ["JD 匹配接口暂未连接成功"],
-        missing: ["后端 /api/jd/match 还未接入"],
-        suggestions: ["先把页面和交互做完整，后端接口完成后即可正常分析"],
+        matched: ["请求失败"],
+        missing: ["后端或模型服务调用异常"],
+        suggestions: [detail],
       });
     } finally {
       setJdLoading(false);
+    }
+  };
+
+  const copyText = async (text: string, successMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert(successMessage);
+    } catch {
+      alert("复制失败，请手动复制");
     }
   };
 
@@ -140,12 +173,21 @@ function App() {
 
       <main className="main-container">
         <section className="hero-panel">
-          <div className="hero-badge">AI 求职工具 Demo</div>
-          <h1>让简历分析、问答与岗位匹配更直观</h1>
+          <div className="hero-badge">AI 求职场景项目 Demo</div>
+          <h1>把简历解析、智能问答和岗位匹配做成真正可展示的产品</h1>
           <p>
-            上传简历后，可查看解析结果、发起简历问答，并基于岗位 JD
-            进行匹配分析。这一版先把产品界面和核心链路搭起来。
+            上传简历后，你可以快速查看解析结果、发起 AI
+            问答，并基于岗位 JD 获取匹配度、缺失项和优化建议。
           </p>
+
+          <div className="hero-actions">
+            <a href="#upload" className="primary-link-btn">
+              立即体验
+            </a>
+            <a href="#jd" className="ghost-link-btn">
+              查看 JD 匹配
+            </a>
+          </div>
         </section>
 
         <section className="content-grid">
@@ -154,9 +196,11 @@ function App() {
               <div className="card-header">
                 <div>
                   <h2>上传简历</h2>
-                  <p>支持 PDF / DOCX / TXT 格式</p>
+                  <p>支持 PDF / DOCX / TXT 格式，建议优先上传文本型 PDF</p>
                 </div>
-                <span className="tag">{resumeText ? "已解析" : "待上传"}</span>
+                <span className={`tag ${hasResume ? "tag-success" : "tag-wait"}`}>
+                  {hasResume ? "已解析" : "待上传"}
+                </span>
               </div>
 
               <div className="upload-area">
@@ -169,6 +213,7 @@ function App() {
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
                         setFile(e.target.files[0]);
+                        setUploadMessage("");
                       }
                     }}
                   />
@@ -182,20 +227,37 @@ function App() {
                   {loading ? "解析中..." : "上传并解析"}
                 </button>
               </div>
+
+              {uploadMessage && (
+                <div
+                  className={`notice ${
+                    uploadMessage.includes("成功") ? "notice-success" : "notice-error"
+                  }`}
+                >
+                  {uploadMessage}
+                </div>
+              )}
             </div>
 
             <div className="card" id="qa">
               <div className="card-header">
                 <div>
                   <h2>简历问答</h2>
-                  <p>围绕简历内容进行智能问答</p>
+                  <p>围绕简历内容提出问题，获取更贴近求职场景的回答</p>
                 </div>
+                <button
+                  className="small-copy-btn"
+                  onClick={() => copyText(qaAnswer || "", "已复制问答结果")}
+                  disabled={!qaAnswer}
+                >
+                  复制结果
+                </button>
               </div>
 
               <div className="input-group">
                 <textarea
                   className="input-textarea"
-                  placeholder="例如：这份简历适合投什么岗位？有哪些亮点？"
+                  placeholder="例如：这份简历适合投什么岗位？有哪些亮点？还缺哪些能力？"
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                 />
@@ -207,7 +269,9 @@ function App() {
               <div className="answer-card">
                 <div className="mini-title">AI 回答</div>
                 <div className="answer-content">
-                  {qaAnswer || "这里会展示基于简历内容生成的回答。"}
+                  {qaLoading
+                    ? "正在分析你的简历内容，请稍等..."
+                    : qaAnswer || "这里会展示基于简历内容生成的回答。"}
                 </div>
               </div>
             </div>
@@ -216,8 +280,20 @@ function App() {
               <div className="card-header">
                 <div>
                   <h2>JD 匹配分析</h2>
-                  <p>输入岗位描述，分析简历匹配度与优化建议</p>
+                  <p>输入岗位描述，分析简历匹配度、缺失项与优化建议</p>
                 </div>
+                <button
+                  className="small-copy-btn"
+                  onClick={() =>
+                    copyText(
+                      JSON.stringify(matchResult, null, 2),
+                      "已复制 JD 匹配结果"
+                    )
+                  }
+                  disabled={!matchResult}
+                >
+                  复制结果
+                </button>
               </div>
 
               <div className="input-group">
@@ -295,9 +371,15 @@ function App() {
               <div className="card-header">
                 <div>
                   <h2>简历解析结果</h2>
-                  <p>系统提取出的原始文本内容</p>
+                  <p>系统提取出的原始文本内容，可作为问答与匹配分析的上下文</p>
                 </div>
-                <span className="tag">{file ? "已载入文件" : "无文件"}</span>
+                <button
+                  className="small-copy-btn"
+                  onClick={() => copyText(resumeText, "已复制简历解析结果")}
+                  disabled={!resumeText}
+                >
+                  复制文本
+                </button>
               </div>
 
               <textarea
