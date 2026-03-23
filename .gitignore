@@ -1,0 +1,22 @@
+# npm cache
+.npm_cache/
+
+# Python
+backend/venv/
+__pycache__/
+*.pyc
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Env
+.env
+backend/.env
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
