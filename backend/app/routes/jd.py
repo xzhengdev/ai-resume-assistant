@@ -1,6 +1,8 @@
 import json
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from app.services.llm_service import analyze_jd_match
 
 router = APIRouter()
@@ -14,10 +16,10 @@ class JDMatchRequest(BaseModel):
 @router.post("/match")
 async def match_jd(data: JDMatchRequest):
     if not data.resumeText.strip():
-        raise HTTPException(status_code=400, detail="简历内容不能为空")
+        raise HTTPException(status_code=400, detail="简历内容不能为空。")
 
     if not data.jdText.strip():
-        raise HTTPException(status_code=400, detail="JD 内容不能为空")
+        raise HTTPException(status_code=400, detail="JD 内容不能为空。")
 
     try:
         analysis_text = analyze_jd_match(data.resumeText, data.jdText)
@@ -26,7 +28,7 @@ async def match_jd(data: JDMatchRequest):
         return {
             "success": True,
             "result": result,
-            "source": "llm"
+            "source": "llm",
         }
     except Exception as e:
         return {
@@ -34,21 +36,21 @@ async def match_jd(data: JDMatchRequest):
             "result": {
                 "score": 72,
                 "matched": [
-                    "具备基础开发能力",
-                    "有项目实践经历",
-                    "有一定 AI 应用落地经验"
+                    "简历体现出一定的软件开发基础。",
+                    "候选人具备项目实践经验。",
+                    "存在一定的 AI 应用落地经历。",
                 ],
                 "missing": [
-                    "部分岗位关键词覆盖不足",
-                    "简历中成果量化不够明显",
-                    "针对目标岗位的描述还不够聚焦"
+                    "部分 JD 关键词覆盖还不够明确。",
+                    "简历中的成果量化不够充分。",
+                    "与目标岗位的针对性还可以进一步加强。",
                 ],
                 "suggestions": [
-                    "补充和岗位强相关的技术关键词",
-                    "增加项目成果的量化描述",
-                    "根据不同岗位准备更有针对性的简历版本"
-                ]
+                    "补充与岗位更相关的关键词。",
+                    "尽量量化项目成果和影响。",
+                    "针对不同岗位准备更有针对性的简历版本。",
+                ],
             },
             "source": "mock",
-            "message": f"大模型分析失败，已返回兜底结果。原因：{str(e)}"
+            "message": f"大模型分析失败，已返回兜底结果：{str(e)}",
         }
