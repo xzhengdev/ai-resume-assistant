@@ -1,4 +1,5 @@
 {
+  // 根 tsconfig 只负责把浏览器端配置和工具端配置组织起来。
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },

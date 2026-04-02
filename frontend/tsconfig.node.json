@@ -1,20 +1,22 @@
 {
   "compilerOptions": {
+    // 给工具侧 TypeScript 文件单独保存增量编译缓存。
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    // 这个配置只覆盖运行在 Node 环境里的工具文件，比如 vite.config.ts。
     "target": "ES2023",
     "lib": ["ES2023"],
     "module": "ESNext",
     "types": ["node"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
+    /* Bundler 模式：与 Vite 解析和执行配置文件的方式保持一致。 */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
 
-    /* Linting */
+    /* 严格检查：工具代码也保持和业务代码同等级别的约束。 */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

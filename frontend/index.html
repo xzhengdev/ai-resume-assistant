@@ -2,12 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- /public 下的资源会被 Vite 直接映射到站点根路径。 -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
   </head>
   <body>
+    <!-- React 会把整个单页应用挂载到这个节点。 -->
     <div id="root"></div>
+    <!-- main.tsx 是前端的启动入口。 -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

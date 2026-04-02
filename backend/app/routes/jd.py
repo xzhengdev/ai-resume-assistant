@@ -1,3 +1,5 @@
+"""JD 匹配分析接口。"""
+
 import json
 
 from fastapi import APIRouter, HTTPException
@@ -9,12 +11,15 @@ router = APIRouter()
 
 
 class JDMatchRequest(BaseModel):
+    """简历与岗位描述匹配分析请求体。"""
+
     resumeText: str
     jdText: str
 
 
 @router.post("/match")
 async def match_jd(data: JDMatchRequest):
+    """返回结构化的简历与 JD 匹配结果。"""
     if not data.resumeText.strip():
         raise HTTPException(status_code=400, detail="简历内容不能为空。")
 
@@ -22,6 +27,7 @@ async def match_jd(data: JDMatchRequest):
         raise HTTPException(status_code=400, detail="JD 内容不能为空。")
 
     try:
+        # 模型被要求直接输出 JSON 文本，这里再反序列化成对象返回给前端。
         analysis_text = analyze_jd_match(data.resumeText, data.jdText)
         result = json.loads(analysis_text)
 
@@ -30,7 +36,8 @@ async def match_jd(data: JDMatchRequest):
             "result": result,
             "source": "llm",
         }
-    except Exception as e:
+    except Exception as exc:
+        # 模型异常或 JSON 解析失败时，仍然给前端一份可展示的默认结构。
         return {
             "success": True,
             "result": {
@@ -52,5 +59,5 @@ async def match_jd(data: JDMatchRequest):
                 ],
             },
             "source": "mock",
-            "message": f"大模型分析失败，已返回兜底结果：{str(e)}",
+            "message": f"大模型分析失败，已返回兜底结果：{str(exc)}",
         }
