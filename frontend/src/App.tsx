@@ -93,15 +93,6 @@ function formatTime(dateText: string) {
   });
 }
 
-function formatSessionTime(dateText: string) {
-  return new Date(dateText).toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 // 如果用户没有手动重命名，会把第一条问题裁剪成默认会话标题。
 function buildSessionTitle(question: string) {
   const normalized = question.replace(/\s+/g, " ").trim();
@@ -129,8 +120,7 @@ function App() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [renamingSessionId, setRenamingSessionId] = useState("");
-  const [renamingTitle, setRenamingTitle] = useState("");
+  const [sessionMenuId, setSessionMenuId] = useState("");
   const [qaLoading, setQaLoading] = useState(false);
   // JD 匹配分析相关状态。
   const [jdText, setJdText] = useState("");
@@ -334,29 +324,27 @@ function App() {
     return nextSession;
   };
 
-  // 进入重命名状态时，先把当前标题放进临时输入框。
-  const startRenameSession = (session: ChatSession) => {
-    setRenamingSessionId(session.id);
-    setRenamingTitle(session.title);
-  };
+  // 会话列表保留极简视觉，但三个点菜单里仍然要能删除会话。
+  const removeSession = (sessionId: string) => {
+    setSessions((currentSessions) => {
+      const filtered = currentSessions.filter((session) => session.id !== sessionId);
 
-  // 空标题直接视为放弃提交，避免用户误把会话名清空。
-  const submitRenameSession = (sessionId: string) => {
-    const nextTitle = renamingTitle.trim();
-    if (!nextTitle) {
-      setRenamingSessionId("");
-      setRenamingTitle("");
-      return;
-    }
+      if (filtered.length === 0) {
+        const fallbackSession = createSession();
+        setActiveSessionId(fallbackSession.id);
+        setQuestion("");
+        return [fallbackSession];
+      }
 
-    updateSession(sessionId, (session) => ({
-      ...session,
-      title: nextTitle,
-      updatedAt: new Date().toISOString(),
-    }));
-    setRenamingSessionId("");
-    setRenamingTitle("");
-    showToast("会话名称已更新", "success");
+      if (sessionId === activeSessionId) {
+        setActiveSessionId(filtered[0].id);
+      }
+
+      return filtered;
+    });
+
+    setSessionMenuId("");
+    showToast("会话已删除", "info");
   };
 
   // 上传新简历时要先清掉旧分析结果，避免不同简历的数据混在一起。
@@ -488,31 +476,6 @@ function App() {
   };
 
   // 删除当前会话后，自动切到剩余会话中的一个，保证界面始终有焦点目标。
-  const removeSession = (sessionId: string) => {
-    setSessions((currentSessions) => {
-      const filtered = currentSessions.filter((session) => session.id !== sessionId);
-
-      if (filtered.length === 0) {
-        const nextSession = createSession();
-        setActiveSessionId(nextSession.id);
-        return [nextSession];
-      }
-
-      if (sessionId === activeSessionId) {
-        setActiveSessionId(filtered[0].id);
-      }
-
-      return filtered;
-    });
-
-    if (renamingSessionId === sessionId) {
-      setRenamingSessionId("");
-      setRenamingTitle("");
-    }
-
-    showToast("会话已删除", "info");
-  };
-
   // Enter 直接发送，Shift + Enter 继续保留换行能力。
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -618,7 +581,7 @@ function App() {
       {/* 顶部导航始终可见，因为上传、聊天、JD 是整个页面的三个固定锚点。 */}
       <header className="topbar">
         <div className="brand">
-          <div className="brand-logo">CV</div>
+          <div className="brand-logo">谢郑</div>
           <div>
             <div className="brand-title">AI 简历对话工作台</div>
             <div className="brand-sub">先上传简历，再围绕内容追问，最后做 JD 匹配。</div>
@@ -637,7 +600,7 @@ function App() {
         <section className="hero-panel">
           <div className="hero-copy">
             <div className="hero-badge">面试准备与岗位匹配</div>
-            <h1>把一份简历，变成一套可以连续打磨的求职对话。</h1>
+            <h1>把一份简历,变成一套可以连续打磨的求职对话 </h1>
             <p>
               这不是单次问答工具，而是一块围绕简历展开的工作台。你可以先导入内容，
               再反复追问亮点、项目表达、面试预演和岗位适配度，让整个过程更像真实准备，而不是零散提问。
@@ -758,12 +721,8 @@ function App() {
             <div className="card-header">
               <div>
                 <h2>第二步：围绕简历连续追问</h2>
-                <p>把简历问答做成真正的工作台，让你能围绕同一份内容持续迭代表达。</p>
               </div>
               <div className="chat-actions">
-                <button className="small-copy-btn" onClick={() => createNewSession()}>
-                  新建对话
-                </button>
                 <button
                   className="small-copy-btn"
                   onClick={() =>
@@ -818,8 +777,6 @@ function App() {
 
                 <div className="session-list">
                   {filteredSessions.map((session) => {
-                    const preview = session.messages[session.messages.length - 1]?.content;
-
                     return (
                       <div
                         key={session.id}
@@ -837,75 +794,41 @@ function App() {
                         }}
                       >
                         <div className="session-item-top">
-                          {renamingSessionId === session.id ? (
-                            <input
-                              className="session-rename-input"
-                              value={renamingTitle}
-                              autoFocus
-                              onChange={(event) => setRenamingTitle(event.target.value)}
-                              onClick={(event) => event.stopPropagation()}
-                              onBlur={() => submitRenameSession(session.id)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  submitRenameSession(session.id);
-                                }
-                                if (event.key === "Escape") {
-                                  setRenamingSessionId("");
-                                  setRenamingTitle("");
-                                }
+                          <div className="session-item-title">{session.title || DEFAULT_SESSION_TITLE}</div>
+                          <div className="session-item-more">
+                            <button
+                              type="button"
+                              className="session-item-more-btn"
+                              title="会话操作"
+                              aria-label="会话操作"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSessionMenuId((current) =>
+                                  current === session.id ? "" : session.id
+                                );
                               }}
-                            />
-                          ) : (
-                            <div className="session-item-title">{session.title || DEFAULT_SESSION_TITLE}</div>
-                          )}
+                            >
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                            </button>
 
-                          <div className="session-item-actions">
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              className="session-item-icon"
-                              title="重命名会话"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                startRenameSession(session);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  startRenameSession(session);
-                                }
-                              }}
-                            >
-                              改
-                            </span>
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              className="session-item-icon session-item-icon-danger"
-                              title="删除会话"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                removeSession(session.id);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  removeSession(session.id);
-                                }
-                              }}
-                            >
-                              删
-                            </span>
+                            {sessionMenuId === session.id && (
+                              <div className="session-item-menu">
+                                <button
+                                  type="button"
+                                  className="session-item-menu-btn"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    removeSession(session.id);
+                                  }}
+                                >
+                                  删除对话
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
-
-                        <div className="session-item-preview">
-                          {preview || "还没有消息，适合从岗位方向、项目亮点或面试问答开始。"}
-                        </div>
-                        <div className="session-item-time">{formatSessionTime(session.updatedAt)}</div>
                       </div>
                     );
                   })}
@@ -917,27 +840,25 @@ function App() {
               </aside>
 
               {/* 右侧主画布把提问建议、历史消息和输入区集中在同一列中。 */}
-              <div className="chat-canvas">
-                <div className="chat-intro-panel">
-                  <div className="chat-hint-tag">推荐提问方向</div>
-                  <p>
-                    先让 AI 帮你判断岗位匹配，再追问项目讲法、面试深挖和需要补强的能力，
-                    会比只问一句“帮我优化简历”更容易得到有用结果。
-                  </p>
-                  <div className="quick-prompt-list">
-                    {QUICK_PROMPTS.map((prompt) => (
-                      <button
-                        key={prompt}
-                        type="button"
-                        className="quick-prompt-btn"
-                        onClick={() => applyQuickPrompt(prompt)}
-                        disabled={!hasResume}
-                      >
-                        {prompt}
-                      </button>
-                    ))}
+              <div className={`chat-canvas ${hasResume ? "" : "chat-canvas-compact"}`}>
+                {hasResume && (
+                  <div className="chat-intro-panel">
+                    <div className="chat-hint-tag">推荐提问方向</div>
+                    <div className="quick-prompt-list">
+                      {QUICK_PROMPTS.map((prompt) => (
+                        <button
+                          key={prompt}
+                          type="button"
+                          className="quick-prompt-btn"
+                          onClick={() => applyQuickPrompt(prompt)}
+                          disabled={!hasResume}
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="chat-history-shell">
                   <div className="chat-history-topbar">
@@ -971,14 +892,16 @@ function App() {
                             message.role === "user" ? "chat-bubble-user" : "chat-bubble-ai"
                           }`}
                         >
-                          <div className="chat-bubble-head">
-                            <div className="chat-bubble-role">
-                              {message.role === "user" ? "我" : "AI 助手"}
+                          {message.role === "assistant" && (
+                            <div className="chat-bubble-head">
+                              <div className="chat-bubble-role">AI 助手</div>
+                              <div className="chat-bubble-time">{formatTime(message.createdAt)}</div>
                             </div>
-                            <div className="chat-bubble-time">{formatTime(message.createdAt)}</div>
-                          </div>
+                          )}
                           <div
                             className={`chat-bubble-content ${
+                              message.role === "user" ? "chat-bubble-content-user" : ""
+                            } ${
                               isMessageTyping(message) ? "chat-bubble-content-typing" : ""
                             }`}
                           >
@@ -1004,23 +927,20 @@ function App() {
                   </div>
 
                   <div className="composer-panel">
-                    <textarea
-                      className="input-textarea chat-textarea"
-                      placeholder={
-                        hasResume
-                          ? "输入你的问题，按 Enter 发送，Shift + Enter 换行。"
-                          : "请先上传简历，聊天输入框会在导入后激活。"
-                      }
-                      value={question}
-                      onChange={(event) => setQuestion(event.target.value)}
-                      onKeyDown={handleKeyDown}
-                      disabled={!hasResume || qaLoading}
-                    />
-                    <div className="composer-footer">
-                      <div className="composer-tip">
-                        当前会话
-                        <span>{activeSession?.title || DEFAULT_SESSION_TITLE}</span>
-                      </div>
+                    <div className="composer-row">
+                      <textarea
+                        className="input-textarea chat-textarea composer-textarea"
+                        rows={1}
+                        placeholder={
+                          hasResume
+                            ? "输入你的问题，按 Enter 发送，Shift + Enter 换行。"
+                            : "请先上传简历，聊天输入框会在导入后激活。"
+                        }
+                        value={question}
+                        onChange={(event) => setQuestion(event.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={!hasResume || qaLoading}
+                      />
                       <button
                         className="primary-btn composer-send-btn"
                         onClick={handleAskQuestion}

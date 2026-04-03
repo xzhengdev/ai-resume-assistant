@@ -30,6 +30,7 @@ async def upload_resume(file: UploadFile = File(...)):
         uploaded_file.write(content)
 
     try:
+        # 返回了解析结果
         resume_text = parse_resume(str(file_path))
         return {
             "success": True,
